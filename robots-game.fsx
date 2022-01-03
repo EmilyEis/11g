@@ -1,9 +1,14 @@
 // Game
 open Robots
 
-
-
-
+let b1 = BoardDisplay (4,3)
+let bb = b1.arr
+b1.Show ()
+printfn ""
+b1.Set (1,1, "gg")
+printfn ""
+b1.Show ()
+printfn ""
 
 
 

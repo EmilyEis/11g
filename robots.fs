@@ -14,11 +14,25 @@ module Robots
 
 // jeg har ændret her bare så jeg kunne få lov til at arbejde videre med det
 type BoardDisplay (rows:int, cols:int) =
-    member this.RowCol = (rows, cols)
-    member this.Set (row:int, col:int, cont:string) = ()
+    let positions = Array.allPairs [|1..rows|] [|1..cols|]
+    let arrPos = [|for n in positions do n, "  "|]
+    member this.arr = arrPos
+    member this.Set (row:int, col:int, cont:string) = 
+        try Array.set this.arr (this.arr |> Array.findIndex (fun elm -> fst elm = (row,col)) ) ((row,col), cont) 
+        with _ -> ()
     member this.SetBottomWall (row:int, col:int) = ()
     member this.SetRightWall (row:int, col:int) = ()
-    member this.show () = ()
+    member this.Show () = 
+        printf "+"; for i in 0..cols-1 do printf "--+"  // fst line
+        for n in 0..rows-1 do 
+            printf "\n|"
+            for x in 0..cols-1 do 
+                if x = cols-1 then printf "%s|" (try snd (Array.find (fun elm -> fst elm = (n+1, x+1)) this.arr) with _ -> "")
+                    else printf "%s " (try snd (Array.find (fun elm -> fst elm = (n+1, x+1)) this.arr) with _ -> "")
+            printf "\n+"
+            for i in 0..cols-1 do 
+                if n = rows-1 then printf "--+"  // last line
+                else printf "  +"
 
 //11g1
 type Position = int*int
@@ -82,9 +96,9 @@ and HorizontalWall (r:int, c:int, n:int) =     // Not sure how to test before Bo
     inherit BoardElement ()
     override this.RenderOn display = 
         if n > 0 then 
-            for i in 0..n do display.Set (r+i, c, "+--+")
+            for i in 0..n do display.Set (r+i, c, "--")
         else 
-            for i in 0..n do display.Set (r-i, c, "+--+")
+            for i in 0..n do display.Set (r-i, c, "--")
 
 // Not sure what it is supposed to do
 and BoardFrame (r:int, c:int) =
