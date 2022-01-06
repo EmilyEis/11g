@@ -1,38 +1,35 @@
 // 11g0
 module Robots
 
-// OBS. det er ikke meningen at noget af det skal virke, det er bare 'signaturen'...
-// så hvad vi skal arbejde videre med
-// type BoardDisplay =
-//     class
-//         new : rows:int * cols:int -> BoardDisplay
-//         member Set : row:int * col:int * cont:string -> unit
-//         member SetBottomWall : row:int * col:int -> unit
-//         member SetRightWall : row:int * col:int -> unit
-//         member Show : unit -> unit
-//     end
-
 // jeg har ændret her bare så jeg kunne få lov til at arbejde videre med det
 type BoardDisplay (rows:int, cols:int) =
     let positions = Array.allPairs [|1..rows|] [|1..cols|]
-    let arrPos = [|for n in positions do n, "  "|]
-    member this.arr = arrPos
+    let arrS = [|for n in positions do n, "  "|]
+    let arrB = [|for n in positions do n, "  +"|]
+    let arrR = [|for n in positions do n, " "|]
+    member this.arrSet = arrS
+    member this.arrBot = arrB
+    member this.arrRig = arrR
     member this.Set (row:int, col:int, cont:string) = 
-        try Array.set this.arr (this.arr |> Array.findIndex (fun elm -> fst elm = (row,col)) ) ((row,col), cont) 
+        try Array.set this.arrSet (this.arrSet |> Array.findIndex (fun elm -> fst elm = (row,col)) ) ((row,col), cont) 
         with _ -> ()
-    member this.SetBottomWall (row:int, col:int) = ()
-    member this.SetRightWall (row:int, col:int) = ()
+    member this.SetBottomWall (row:int, col:int) = 
+        try Array.set this.arrBot (this.arrBot |> Array.findIndex (fun elm -> fst elm = (row,col)) ) ((row,col), "--+") 
+        with _ -> ()
+    member this.SetRightWall (row:int, col:int) = 
+        try Array.set this.arrRig (this.arrRig |> Array.findIndex (fun elm -> fst elm = (row,col)) ) ((row,col), "|") 
+        with _ -> ()
     member this.Show () = 
         printf "+"; for i in 0..cols-1 do printf "--+"  // fst line
-        for n in 0..rows-1 do 
+        for n in 0..rows-1 do
             printf "\n|"
-            for x in 0..cols-1 do 
-                if x = cols-1 then printf "%s|" (try snd (Array.find (fun elm -> fst elm = (n+1, x+1)) this.arr) with _ -> "")
-                    else printf "%s " (try snd (Array.find (fun elm -> fst elm = (n+1, x+1)) this.arr) with _ -> "")
+            for x in 0..cols-1 do
+                if x = cols-1 then printf "%s|" (try snd (Array.find (fun elm -> fst elm = (n+1, x+1)) this.arrSet) with _ -> "")
+                else printf "%s%s" (try snd (Array.find (fun elm -> fst elm = (n+1, x+1)) this.arrSet) with _ -> "") (try snd (Array.find (fun elm -> fst elm = (n+1, x+1)) this.arrRig) with _ -> "")
             printf "\n+"
             for i in 0..cols-1 do 
                 if n = rows-1 then printf "--+"  // last line
-                else printf "  +"
+                else printf "%s" (try snd (Array.find (fun elm -> fst elm = (n+1, i+1)) this.arrBot) with _ -> "")
 
 //11g1
 type Position = int*int
@@ -62,7 +59,7 @@ and Robot (row:int, col:int, name:string) =
         | East  -> if r1+1 = r2 then Stop (r1, c1) else Continue (dir, (r1, c1))
         | West  -> if r1-1 = r2 then Stop (r1, c1) else Continue (dir, (r1, c1))
         
-    override this.RenderOn display =    // Can't test before BoardDisplay is implemented
+    override this.RenderOn display =    // ok
         display.Set (fst this.Position, snd this.Position, this.Name)
 
     member val Name = name      // ok
@@ -83,31 +80,25 @@ and Goal (r:int, c:int) =
     override this.GameOver (robots:Robot list) = robots |> List.exists (fun (x:Robot) -> x.Position = (r,c))
 
 // Sets an inner vertical wall in a board
-and VerticalWall (r:int, c:int, n:int) =   // Not sure how to test before BoardDisplay is implemented
+and VerticalWall (r:int, c:int, n:int) =   // ok
     inherit BoardElement ()
     override this.RenderOn display = 
-        if n > 0 then 
-            for i in 0..n do display.Set (r, c+i, "+\n|\n+")
-        else 
-            for i in 0..n do display.Set (r, c-i, "+\n|\n+")
+        for i in 0..n do display.SetRightWall ((if n > 0 then r+i else r-i), c)
 
 // Sets an inner horizontal wall in a board
-and HorizontalWall (r:int, c:int, n:int) =     // Not sure how to test before BoardDisplay is implemented
+and HorizontalWall (r:int, c:int, n:int) =     // ok
     inherit BoardElement ()
     override this.RenderOn display = 
-        if n > 0 then 
-            for i in 0..n do display.Set (r+i, c, "--")
-        else 
-            for i in 0..n do display.Set (r-i, c, "--")
+        for i in 0..n do display.SetBottomWall (r, if n > 0 then c+i else c-i)
 
 // Not sure what it is supposed to do
 and BoardFrame (r:int, c:int) =
     inherit BoardElement ()
     override this.RenderOn display = display.SetBottomWall (r, c); display.SetRightWall (r, c)
 
-type Board (display:BoardDisplay) =
+type Board (display: BoardDisplay) =
     member this.AddRobot (robot:Robot) = robot.RenderOn display
-    member this.AddElement (element:BoardElement) = element.RenderOn display    // ???
+    member this.AddElement (element:BoardElement) = element.RenderOn display
     member this.Elements = []    // returns BoardElement list
     member this.Robots = []      // returns Robot list
     member this.Move (robot:Robot, dir:Direction) = 
