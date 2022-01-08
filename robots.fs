@@ -6,22 +6,41 @@ type BoardDisplay (rows:int, cols:int) =
     let bWalls = Array2D.create (rows+1) cols "  "
     let rWalls = Array2D.create rows (cols+1) " " 
 
+    ///<summary>Sets the contents of a position in the board.</summary>
+    ///<param name="row">Number of rows.</param>
+    ///<param name="col">Number of columns.</param>
+    ///<param name="cont">The contents of the field.</param>
+    ///<returns>Unit.</returns>
     member this.Set (row:int, col:int, cont:string) =
         boardArray.[row-1,col-1] <- cont
 
+    ///<summary>Retrieves the contents of a field.</summary>
+    ///<param name="row">Row-index</param>
+    ///<param name="col">Column-index</param>
+    ///<returns>Unit.</returns>
     member this.Get(row:int, col:int) =
         boardArray.[row-1,col-1]
 
+    ///<summary>Sets the bottom wall(s) in a display.</summary>
+    ///<param name="row">Number of rows.</param>
+    ///<param name="cols">Number of columns.</param>
+    ///<returns>Unit.</returns>
     member this.SetBottomWall (row:int, col:int) = 
         bWalls.[row,col] <- "--"
 
+    ///<summary>Sets the right wall(s) in a display.</summary>
+    ///<param name="row">Number of rows.</param>
+    ///<param name="cols">Number of columns.</param>
+    ///<returns>Unit.</returns>
     member this.SetRightWall (row:int, col:int) =
         rWalls.[row,col] <- "|"
 
+    ///<summary>Prints the board to the user.</summary>
+    ///<returns>Unit.</returns>
     member this.Show () =
         let mutable toPrint = ""
 
-        // Create the first row frame thing
+        // Create the first row in frame
         toPrint <- toPrint + "+"
         for c in 0..cols-1 do 
             let wall = bWalls.[0,c]
@@ -53,9 +72,20 @@ type Action =
 
 [<AbstractClass >] 
 type BoardElement () =
+    ///<summary>The element renders itself onto the board.</summary>
+    ///<param name="display">Number of rows.</param>
+    ///<returns>Unit.</returns>
     abstract member RenderOn : BoardDisplay -> unit
+
+    ///<summary>Checks if robot is colliding with elements.</summary>
+    ///<param name="other">The robot moving.</param>
+    ///<param name="dir">The direction the robot is moving in.</param>
+    ///<returns>Action.</returns>
     abstract member Interact : Robot -> Direction -> Action
     default __.Interact _ _ = Ignore
+    ///<summary>Checks if the game is won if robot is standing on goal.</summary>
+    ///<param name="robots">A list of all robots in the board.</param>
+    ///<returns>bool.</returns>
     abstract member GameOver : Robot list -> bool
     default __.GameOver _ = false
 
@@ -64,6 +94,8 @@ and Robot (row:int, col:int, name:string) =
 
     let mutable pos = (row, col)          
 
+    ///<summary>Retrieves and sets the current position of the robot.</summary>
+    ///<returns>Position or unit.</returns>
     member this.Position with get () = pos and set (r,c) = pos <- (r,c)  
 
     override this.Interact other dir =      
@@ -78,7 +110,7 @@ and Robot (row:int, col:int, name:string) =
         display.Set (fst this.Position, snd this.Position, this.Name)
 
     member val Name = name      
-
+    // Robot takes one step in direction dir
     member this.Step dir =     
         let (r,c) = this.Position
         match dir with
@@ -92,8 +124,6 @@ and Robot (row:int, col:int, name:string) =
 and Goal (r:int, c:int) =
     inherit BoardElement ()
 
-    member this.Position = (r,c)
-
     override this.RenderOn display = display.Set (r, c, "gg")
 
     // If any robot in a list robots is on a goal (r, c) the game is over
@@ -102,25 +132,18 @@ and Goal (r:int, c:int) =
 // Sets an inner vertical wall in a board
 and VerticalWall (r:int, c:int, n:int) =   // ok
     inherit BoardElement ()
-
     let rows =
         if n<0 then [(r-n)..r-1]
         else [r..(r+n-1)]
-    member this.Position = (r,c)
 
     override this.Interact other dir = 
         let (r1, c1) = other.Position
         if List.contains r1 rows then
             match dir with
-                | East -> 
-                    if c1 = c then Stop (r1, c1)
-                    else Ignore
-                | West ->
-                    if (c1-1) = c then Stop (r1, c1)
-                    else Ignore
+                | East -> if c1 = c then Stop (r1, c1) else Ignore
+                | West -> if (c1-1) = c then Stop (r1, c1) else Ignore
                 | _ -> Ignore
         else Ignore
-
         
     override this.RenderOn display = 
         let (row,col) = (r-1, c)
@@ -135,18 +158,12 @@ and HorizontalWall (r:int, c:int, n:int) =
         if n < 0 then [(c-n)..c-1]
         else [c..c+n-1]
 
-    member this.Position = (r,c)
-
     override this.Interact other dir =
         let (r1, c1)= other.Position
         if List.contains c1 columns then
             match dir with
-                | North -> 
-                    if (r1-1) = r then Stop (r1, c1)
-                    else Ignore
-                | South ->
-                    if r1 = r then Stop (r1, c1)
-                    else Ignore
+                | North -> if (r1-1) = r then Stop (r1, c1) else Ignore
+                | South -> if r1 = r then Stop (r1, c1) else Ignore
                 | _ -> Ignore
         else Ignore
 
@@ -154,11 +171,8 @@ and HorizontalWall (r:int, c:int, n:int) =
         let (row,col) = (r, c-1)
         for i in 0..n-1 do display.SetBottomWall (row, col+i)
 
-// Not sure what it is supposed to do
 and BoardFrame (r:int, c:int) =
     inherit BoardElement ()
-
-    member this.Position = (r,c)
 
     override this.Interact other dir =
         let (r1, c1) = other.Position
@@ -175,6 +189,21 @@ and BoardFrame (r:int, c:int) =
         for i in 0..c-1 do
             display.SetBottomWall(0, i)
             display.SetBottomWall(r, i)
+    
+and Teleport (r:int, c:int) =
+    inherit BoardElement ()
+
+    override this.Interact other dir = 
+        let (r1, c1) = other.Position
+        match dir with
+        | North -> if (r1-1, c1) = (r, c) then Stop (r, c) else Ignore
+        | South -> if (r1+1, c1) = (r, c) then Stop (r, c) else Ignore
+        | East  -> if (r1, c1+1) = (r, c) then Stop (r, c) else Ignore
+        | West  -> if (r1, c1-1) = (r, c) then Stop (r, c) else Ignore
+
+    override this.RenderOn display =
+        display.Set (r, c, "tp")
+
 
 type Board (rows:int, cols:int) =
     let mutable elementList : BoardElement list = []
@@ -187,11 +216,17 @@ type Board (rows:int, cols:int) =
 
     member this.display = dis
 
+    ///<summary>Adds robot to board.</summary>
+    ///<param name="robot">The robot to be added.</param>
+    ///<returns>Unit.</returns>
     member this.AddRobot (robot:Robot) =    
         robot.RenderOn this.display
         robotList   <- robot::robotList
         elementList <- robot:>BoardElement::elementList
 
+    ///<summary>Adds element to board (also robots).</summary>
+    ///<param name="element">The element to be added.</param>
+    ///<returns>Unit.</returns>
     member this.AddElement (element:BoardElement) =     
         element.RenderOn this.display
         elementList <- element::elementList
@@ -200,23 +235,29 @@ type Board (rows:int, cols:int) =
 
     member this.Robots = robotList
 
+    ///<summary>Moves robot in a direction until it is told to stop.</summary>
+    ///<param name="robot">The robot to be moved.</param>
+    ///<param name="dir">The direction.</param>
+    ///<returns>Unit.</returns>
     member this.Move (robot:Robot, dir:Direction) = 
         let rec helper (robot:Robot, dir:Direction) =
             let actions = List.map (fun (x:BoardElement) -> x.Interact robot dir) this.Elements |> List.filter (fun x -> x <> Ignore)
+            let field = this.display.Get(fst robot.Position, snd robot.Position)
             match actions with
             | [] -> 
-                let field = this.display.Get(fst robot.Position, snd robot.Position)
-                if not (field = "gg") then
+                if not (field = "gg") then      // So we don't overwrite the goal when sliding across!
                     this.display.Set (fst robot.Position, snd robot.Position, "  ")
                 robot.Step (dir)
                 helper (robot, dir)
+
             | stops ->
                 let projection =
                     match dir with
                     | East  | West  -> (fun (Stop s) -> snd s)
                     | South | North -> (fun (Stop s) -> fst s)
                 let (Stop (r,c)) = (List.sortBy projection stops).[0]
-                this.display.Set (fst robot.Position, snd robot.Position, "  ")
+                if not (field = "gg") then      // So we don't overwrite the goal when sliding across!
+                    this.display.Set (fst robot.Position, snd robot.Position, "  ")
                 robot.Position <- (r,c)
                 robot.RenderOn this.display
 
@@ -227,13 +268,12 @@ type Game (board: Board) =
     let mutable moves = 0
     let mutable isRunning = false
 
-    // member this.Teleport (robot:Robot) = 
-    //     let rand = Random()
-    //     let (r,c) = (rand.Next (fst board.size), rand.Next (snd board.size))
-    //     "j"
-
-    member this.Play () =  // return number of moves before game over
-        board.AddElement (BoardFrame board.size)    // game must always have boardframe
+    ///<summary>Starts the game and interacts with the user.</summary>
+    ///<returns>The number of moves it took to beat the game.</returns>
+    member this.Play () = 
+        System.Console.Clear ()
+        printfn "------------ Let's play Ricochet Robots! ------------\n"
+        board.AddElement (BoardFrame board.size)    
         printfn "\nThis is your robots"
         board.Robots |> List.iter (fun (x:Robot) -> printfn "%s: position %A" x.Name x.Position) 
         printfn "\nThis is your board!"
